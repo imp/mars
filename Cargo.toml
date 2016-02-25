@@ -1,6 +1,10 @@
 [package]
 name = "mars"
-version = "0.1.0"
+version = "0.0.0"
 authors = ["Cyril Plisko <cyril.plisko@mountall.com>"]
+description = "MA.RS - CoreWar in Rust"
+license = "Apache-2.0/MIT"
+repository = "https://gitlab.com/imp/mars.git"
+homepage = "https://gitlab.com/imp/mars"
 
 [dependencies]
