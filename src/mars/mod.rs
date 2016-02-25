@@ -1,17 +1,17 @@
 //! ICWS '94 draft
 //!
 
+use std::cmp::PartialEq;
 use std::default::Default;
+use std::ops::{Index, IndexMut};
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Warrior(u32);
 
 // #[derive(Clone, Copy, Debug, Default)]
 // pub struct Address(u32);
 pub type Address = u32;
 
 #[derive(Clone, Copy, Debug)]
-enum Opcode {
+pub enum Opcode {
     DAT, // terminate process
     MOV, // move from A to B
     ADD, // add A to B, store result in B
@@ -40,7 +40,7 @@ impl Default for Opcode {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Modifier {
+pub enum Modifier {
     A,
     B,
     AB,
@@ -55,13 +55,13 @@ impl Default for Modifier {
         Modifier::A
     }
 }
-#[derive(Clone, Copy, Debug)]
-enum Mode {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Mode {
     IMMEDIATE, // #
     DIRECT, // $ (Default)
     INDIRECT, // @
-    PREDECREMENT, // <
-    POSTINCREMENT, // >
+    DECREMENT, // <
+    INCREMENT, // >
 }
 
 impl Default for Mode {
@@ -72,32 +72,22 @@ impl Default for Mode {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Instruction {
-    opcode: Opcode,
-    modifier: Modifier,
-    a_mode: Mode,
-    a_address: Address,
-    b_mode: Mode,
-    b_address: Address,
+    pub opcode: Opcode,
+    pub modifier: Modifier,
+    pub a_mode: Mode,
+    pub a_number: Address,
+    pub b_mode: Mode,
+    pub b_number: Address,
 }
-
-// impl Default for Instruction {
-//     fn default() -> Self {
-//         Instruction {
-//             opcode: Opcode::DAT,
-//             modifier: Modifier::F,
-//             a_mode: Mode::IMMEDIATE,
-//             a_address: 0,
-//             b_mode: Mode::IMMEDIATE,
-//             b_address: 0,
-//         }
-//     }
-// }
 
 impl Instruction {
     pub fn random() -> Self {
         Instruction::default()  // XXX Need real random implementation
     }
 }
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Warrior(u32);
 
 // #[derive(Debug)]
 // struct TaskPointer(Address);
@@ -122,11 +112,30 @@ impl TaskQueue {
 }
 
 #[derive(Debug)]
+struct CoreMemory(Vec<Instruction>);
+
+impl Index<Address> for CoreMemory {
+    type Output = Instruction;
+
+    fn index<'a>(&'a self, _index: Address) -> &'a Instruction {
+        &self.0[_index as usize]
+    }
+}
+
+impl IndexMut<Address> for CoreMemory {
+    fn index_mut<'a>(&'a mut self, _index: Address) -> &'a mut Instruction {
+        &mut self.0[_index as usize]
+    }
+}
+
+#[derive(Debug)]
 pub struct Core {
     core_size: Address,
-    instructions: Vec<Instruction>,
+    core: CoreMemory,
     warrior: [TaskQueue; 2],
     pc: Address,
+    read_limit: Address,
+    write_limit: Address,
 }
 
 impl Core {
@@ -134,14 +143,58 @@ impl Core {
         self.warrior[warrior].queue(task_pointer)
     }
 
-    pub fn fold(&self, pointer: Address, limit: Address) -> Address {
-        let mut result;
-
-        result = pointer % limit;
+    fn fold(&self, pointer: Address, limit: Address) -> Address {
+        let mut result = pointer % limit;
         if result > limit / 2 {
             result += self.core_size - limit;
         }
         result
+    }
+
+    pub fn emi94(&mut self) {
+        let ir: Instruction;
+        let ira: Instruction;
+        let irb: Instruction;
+        let mut rpa: Address;
+        let mut wpa: Address;
+        let rpb: Address;
+        let wpb: Address;
+        let pip: Address;
+
+        ir = self.core[self.pc];
+
+        // Evaluate A-operand
+        //
+        if ir.a_mode == Mode::IMMEDIATE {
+            // For instructions with an Immediate A-mode, the Pointer A
+            // points to the source of the current instruction.
+            rpa = 0;
+            wpa = 0;
+        } else {
+            // For instructions with a Direct A-mode, the Pointer A
+            // points to the instruction IR.ANumber away, relative to
+            // the Program Counter.
+            rpa = self.fold(ir.a_number, self.read_limit);
+            wpa = self.fold(ir.a_number, self.write_limit);
+
+            if ir.a_mode != Mode::DIRECT {
+                if ir.a_mode == Mode::DECREMENT {
+                    self.core[((self.pc + wpa) % self.core_size)].b_number =
+                        (self.core[((self.pc + wpa) % self.core_size)].b_number +
+                         self.core_size - 1) % self.core_size;
+                }
+
+                if ir.a_mode == Mode::INCREMENT {
+                    pip = (self.pc + wpa) % self.core_size;
+                }
+
+                rpa = self.fold((rpa + self.core[((self.pc + rpa) % self.core_size)].b_number),
+                                self.read_limit);
+                wpa = self.fold((wpa + self.core[((self.pc + wpa) % self.core_size)].b_number),
+                                self.write_limit);
+            }
+        }
+
     }
 }
 
@@ -195,15 +248,17 @@ impl CoreBuilder {
 
         Core {
             core_size: self.core_size,
-            instructions: instructions,
+            core: CoreMemory(instructions),
             warrior: [TaskQueue::new(self.task_limit), TaskQueue::new(self.task_limit)],
             pc: 0,
+            read_limit: 300,
+            write_limit: 300,
         }
     }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     #[test]
     fn it_works() {}
 }
