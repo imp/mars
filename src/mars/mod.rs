@@ -156,6 +156,21 @@ impl Core {
         result
     }
 
+    pub fn evaluate(&mut self, mode: Mode, number: Address) -> (Address, Address) {
+        // let mut rp: Address;
+        // let mut wp: Address;
+        let rlim = self.read_limit;
+        let wlim = self.write_limit;
+
+        match mode {
+            Mode::IMMEDIATE => (0, 0),
+            Mode::DIRECT => (self.fold(number, rlim), self.fold(number, wlim)),
+            Mode::INDIRECT => (self.fold(number, rlim), self.fold(number, wlim)),
+            Mode::DECREMENT => (self.fold(number, rlim), self.fold(number, wlim)),
+            Mode::INCREMENT => (self.fold(number, rlim), self.fold(number, wlim)),
+        }
+    }
+
     pub fn emi94(&mut self, pc: Address) {
         let ir: Instruction;
         let ira: Instruction;
