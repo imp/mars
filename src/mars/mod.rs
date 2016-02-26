@@ -89,9 +89,6 @@ impl Instruction {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Warrior(u32);
 
-// #[derive(Debug)]
-// struct TaskPointer(Address);
-
 #[derive(Debug)]
 pub struct TaskQueue {
     task_limit: usize,
@@ -102,12 +99,22 @@ impl TaskQueue {
     fn new(limit: usize) -> Self {
         TaskQueue {
             task_limit: limit,
-            task_pointer: vec![0,],
+            task_pointer: Vec::<Address>::with_capacity(limit),
         }
     }
 
     pub fn queue(&mut self, addr: Address) {
-        self.task_pointer.push(addr);
+        if self.task_pointer.len() < self.task_limit {
+            self.task_pointer.push(addr);
+        }
+    }
+
+    pub fn next(&mut self) -> Option<Address> {
+        if self.task_pointer.len() > 0 {
+            Some(self.task_pointer.remove(0))
+        } else {
+            None
+        }
     }
 }
 
@@ -259,6 +266,35 @@ impl CoreBuilder {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
-    fn it_works() {}
+    fn task_queue_simple() {
+        let mut tq = TaskQueue::new(2);
+        tq.queue(1);
+        tq.queue(3);
+        assert_eq!(tq.next(), Some(1));
+        assert_eq!(tq.next(), Some(3));
+        assert_eq!(tq.next(), None);
+    }
+
+    #[test]
+    fn task_queue_limit() {
+        let mut tq = TaskQueue::new(3);
+        tq.queue(100);
+        tq.queue(200);
+        tq.queue(300);
+        tq.queue(400);
+
+        assert_eq!(tq.next(), Some(100));
+        assert_eq!(tq.next(), Some(200));
+        assert_eq!(tq.next(), Some(300));
+        assert_eq!(tq.next(), None);
+    }
+
+    #[test]
+    fn task_queue_empty() {
+        let mut tq = TaskQueue::new(100);
+
+        assert_eq!(tq.next(), None);
+    }
 }
