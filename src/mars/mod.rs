@@ -156,7 +156,7 @@ impl Core {
         result
     }
 
-    pub fn emi94(&mut self) {
+    pub fn emi94(&mut self, pc: Address) {
         let ir: Instruction;
         let ira: Instruction;
         let irb: Instruction;
