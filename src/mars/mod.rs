@@ -1,8 +1,6 @@
 //! ICWS '94 draft
 //!
 
-use std::cmp::PartialEq;
-use std::default::Default;
 use std::ops::{Index, IndexMut};
 
 
