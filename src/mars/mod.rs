@@ -164,7 +164,7 @@ impl Core {
         let mut wpa: Address;
         let rpb: Address;
         let wpb: Address;
-        let pip: Address;
+        let mut pip: Address = 0;
 
         ir = self.core[pc];
 
