@@ -138,7 +138,7 @@ pub struct Core {
     core_size: Address,
     core: CoreMemory,
     warrior: [TaskQueue; 2],
-    pc: Address,
+    // pc: Address,
     read_limit: Address,
     write_limit: Address,
 }
@@ -166,7 +166,7 @@ impl Core {
         let wpb: Address;
         let pip: Address;
 
-        ir = self.core[self.pc];
+        ir = self.core[pc];
 
         // Evaluate A-operand
         //
@@ -184,18 +184,18 @@ impl Core {
 
             if ir.a_mode != Mode::DIRECT {
                 if ir.a_mode == Mode::DECREMENT {
-                    self.core[((self.pc + wpa) % self.core_size)].b_number =
-                        (self.core[((self.pc + wpa) % self.core_size)].b_number +
-                         self.core_size - 1) % self.core_size;
+                    self.core[((pc + wpa) % self.core_size)].b_number =
+                        (self.core[((pc + wpa) % self.core_size)].b_number + self.core_size - 1) %
+                        self.core_size;
                 }
 
                 if ir.a_mode == Mode::INCREMENT {
-                    pip = (self.pc + wpa) % self.core_size;
+                    pip = (pc + wpa) % self.core_size;
                 }
 
-                rpa = self.fold((rpa + self.core[((self.pc + rpa) % self.core_size)].b_number),
+                rpa = self.fold((rpa + self.core[((pc + rpa) % self.core_size)].b_number),
                                 self.read_limit);
-                wpa = self.fold((wpa + self.core[((self.pc + wpa) % self.core_size)].b_number),
+                wpa = self.fold((wpa + self.core[((pc + wpa) % self.core_size)].b_number),
                                 self.write_limit);
             }
         }
@@ -255,7 +255,6 @@ impl CoreBuilder {
             core_size: self.core_size,
             core: CoreMemory(instructions),
             warrior: [TaskQueue::new(self.task_limit), TaskQueue::new(self.task_limit)],
-            pc: 0,
             read_limit: 300,
             write_limit: 300,
         }
