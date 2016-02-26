@@ -156,6 +156,22 @@ impl Core {
         result
     }
 
+    fn direct(&self, number: Address) -> (Address, Address) {
+        (self.fold(number, self.read_limit),
+         self.fold(number, self.write_limit))
+    }
+
+    fn indirect_pointer(&self, pc: Address, number: Address, limit: Address) -> Address {
+        let p = self.fold(number, limit);
+        let i = p + self.core[((pc + p) % self.core_size)].b_number;
+        self.fold(i, limit)
+    }
+
+    fn indirect(&self, pc: Address, number: Address) -> (Address, Address) {
+        (self.indirect_pointer(pc, number, self.read_limit),
+         self.indirect_pointer(pc, number, self.write_limit))
+    }
+
     pub fn evaluate(&mut self, pc: Address, mode: Mode, number: Address) -> (Address, Address) {
         // let mut rp: Address;
         // let mut wp: Address;
@@ -164,16 +180,8 @@ impl Core {
 
         match mode {
             Mode::IMMEDIATE => (0, 0),
-            Mode::DIRECT => (self.fold(number, rlim), self.fold(number, wlim)),
-            Mode::INDIRECT => {
-                let mut rp = self.fold(number, rlim);
-                let mut wp = self.fold(number, wlim);
-                rp = self.fold((rp + self.core[((pc + rp) % self.core_size)].b_number),
-                               rlim);
-                wp = self.fold((wp + self.core[((pc + wp) % self.core_size)].b_number),
-                               wlim);
-                (rp, wp)
-            }
+            Mode::DIRECT => self.direct(number),
+            Mode::INDIRECT => self.indirect(pc, number),
             Mode::DECREMENT => (self.fold(number, rlim), self.fold(number, wlim)),
             Mode::INCREMENT => (self.fold(number, rlim), self.fold(number, wlim)),
         }
