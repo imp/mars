@@ -200,6 +200,12 @@ impl Core {
             }
         }
 
+        ira = self.core[((pc + rpa) % self.core_size)];
+
+        if ir.a_mode == Mode::INCREMENT {
+            self.core[pip].b_number = (self.core[pip].b_number + 1) % self.core_size;
+        }
+
     }
 }
 
