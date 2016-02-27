@@ -8,7 +8,7 @@ use std::ops::{Index, IndexMut};
 // pub struct Address(u32);
 pub type Address = u32;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Opcode {
     DAT, // terminate process
     MOV, // move from A to B
@@ -37,7 +37,7 @@ impl Default for Opcode {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Modifier {
     A,
     B,
@@ -68,7 +68,7 @@ impl Default for Mode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Instruction {
     pub opcode: Opcode,
     pub modifier: Modifier,
@@ -117,28 +117,45 @@ impl TaskQueue {
 }
 
 #[derive(Debug)]
-struct CoreMemory(Vec<Instruction>);
+pub struct CoreMemory(Address, Vec<Instruction>);
 
 impl Index<Address> for CoreMemory {
     type Output = Instruction;
 
     fn index<'a>(&'a self, _index: Address) -> &'a Instruction {
-        &self.0[_index as usize]
+        &self.1[(_index % self.0) as usize]
     }
 }
 
 impl IndexMut<Address> for CoreMemory {
     fn index_mut<'a>(&'a mut self, _index: Address) -> &'a mut Instruction {
-        &mut self.0[_index as usize]
+        &mut self.1[(_index % self.0) as usize]
+    }
+}
+
+impl CoreMemory {
+    fn new(size: Address, initial_instruction: InitialInstruction) -> Self {
+        let mut instructions = Vec::<Instruction>::new();
+        for _ in 0..size {
+            instructions.push(match initial_instruction {
+                InitialInstruction::Default => Instruction::default(),
+                InitialInstruction::Random => Instruction::random(),
+                InitialInstruction::Instruction(insn) => insn,
+            })
+        }
+
+        CoreMemory(size, instructions)
+    }
+
+    fn size(&self) -> Address {
+        self.0
     }
 }
 
 #[derive(Debug)]
 pub struct Core {
-    core_size: Address,
     core: CoreMemory,
     warrior: [TaskQueue; 2],
-    // pc: Address,
     read_limit: Address,
     write_limit: Address,
 }
@@ -151,7 +168,7 @@ impl Core {
     fn fold(&self, pointer: Address, limit: Address) -> Address {
         let mut result = pointer % limit;
         if result > limit / 2 {
-            result += self.core_size - limit;
+            result += self.core.size() - limit;
         }
         result
     }
@@ -163,7 +180,7 @@ impl Core {
 
     fn indirect_pointer(&self, pc: Address, number: Address, limit: Address) -> Address {
         let p = self.fold(number, limit);
-        let i = p + self.core[((pc + p) % self.core_size)].b_number;
+        let i = p + self.core[pc + p].b_number;
         self.fold(i, limit)
     }
 
@@ -196,6 +213,7 @@ impl Core {
         let rpb: Address;
         let wpb: Address;
         let mut pip: Address = 0;
+        let size = self.core.size();
 
         ir = self.core[pc];
 
@@ -215,32 +233,28 @@ impl Core {
 
             if ir.a_mode != Mode::DIRECT {
                 if ir.a_mode == Mode::DECREMENT {
-                    self.core[((pc + wpa) % self.core_size)].b_number =
-                        (self.core[((pc + wpa) % self.core_size)].b_number + self.core_size - 1) %
-                        self.core_size;
+                    self.core[pc + wpa].b_number = (self.core[pc + wpa].b_number + size - 1) % size;
                 }
 
                 if ir.a_mode == Mode::INCREMENT {
-                    pip = (pc + wpa) % self.core_size;
+                    pip = (pc + wpa) % size;
                 }
 
-                rpa = self.fold((rpa + self.core[((pc + rpa) % self.core_size)].b_number),
-                                self.read_limit);
-                wpa = self.fold((wpa + self.core[((pc + wpa) % self.core_size)].b_number),
-                                self.write_limit);
+                rpa = self.fold((rpa + self.core[pc + rpa].b_number), self.read_limit);
+                wpa = self.fold((wpa + self.core[pc + wpa].b_number), self.write_limit);
             }
         }
 
-        ira = self.core[((pc + rpa) % self.core_size)];
+        ira = self.core[pc + rpa];
 
         if ir.a_mode == Mode::INCREMENT {
-            self.core[pip].b_number = (self.core[pip].b_number + 1) % self.core_size;
+            self.core[pip].b_number = (self.core[pip].b_number + 1) % size;
         }
 
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum InitialInstruction {
     Default,
     Random,
@@ -289,8 +303,7 @@ impl CoreBuilder {
         }
 
         Core {
-            core_size: self.core_size,
-            core: CoreMemory(instructions),
+            core: CoreMemory::new(self.core_size, self.initial_instruction),
             warrior: [TaskQueue::new(self.task_limit), TaskQueue::new(self.task_limit)],
             read_limit: 300,
             write_limit: 300,
@@ -330,5 +343,17 @@ mod tests {
         let mut tq = TaskQueue::new(100);
 
         assert_eq!(tq.next(), None);
+    }
+
+    #[test]
+    fn core_mem_size() {
+        let core = CoreMemory::new(2, InitialInstruction::Default);
+        assert_eq!(core.size(), 2);
+    }
+
+    #[test]
+    fn core_mem_wrap() {
+        let core = CoreMemory::new(2, InitialInstruction::Default);
+        assert_eq!(core[0], core[2]);
     }
 }
