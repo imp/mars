@@ -293,15 +293,6 @@ impl CoreBuilder {
     }
 
     pub fn build(&self) -> Core {
-        let mut instructions = Vec::<Instruction>::new();
-        for _ in 0..self.core_size {
-            instructions.push(match self.initial_instruction {
-                InitialInstruction::Default => Instruction::default(),
-                InitialInstruction::Random => Instruction::random(),
-                InitialInstruction::Instruction(insn) => insn,
-            })
-        }
-
         Core {
             core: CoreMemory::new(self.core_size, self.initial_instruction),
             warrior: [TaskQueue::new(self.task_limit), TaskQueue::new(self.task_limit)],
